@@ -1,0 +1,177 @@
+# coding: utf-8
+
+import tensorflow as tf 
+
+class MPCNN:
+	def __init__(self, arg_config):
+		self.x1_input = tf.placeholder(tf.int32, [None, arg_config.max_length], name="input_x1") # [batch_size, max_length]
+		self.x2_input = tf.placeholder(tf.int32, [None, arg_config.max_length], name="input_x2") # [batch_size, max_length]
+		self.label = tf.placeholder(tf.int32, [None, arg_config.num_classes], name="label") # [batch_size, num_classses]
+
+		with tf.variable_scope("embedding_layer"):
+			W = tf.get_variable("W", [arg_config.vocab_size, arg_config.embedding_size], initializer=tf.random_normal_initializer(mean=0, stddev=1))
+			self.x1_embedding = tf.nn.embedding_lookup(W, self.x1_input, name="x1_embedding") # [batch_size, max_length, embedding_size]
+			self.x2_embedding = tf.nn.embedding_lookup(W, self.x2_input, name="x2_embedding") # [batch_size, max_length, embedding_size]
+
+		self.x1_embedding_expand = tf.expand_dims(self.x1_embedding, axis=-1, name="x1_embedding_expand") # [batch_size, max_length, embedding_size, 1]
+		self.x2_embedding_expand = tf.expand_dims(self.x2_embedding, axis=-1, name="x2_embedding_expand") # [batch_size, max_length, embedding_size, 1]
+
+		# block A
+		x1_avg_pooled_output_groupA = []
+		x1_min_pooled_output_groupA = []
+		x1_max_pooled_output_groupA = []
+		x2_avg_pooled_output_groupA = []
+		x2_min_pooled_output_groupA = []
+		x2_max_pooled_output_groupA = []
+
+		# block B
+		x1_min_pooled_output_groupB = []
+		x1_max_pooled_output_groupB = []
+		x2_min_pooled_output_groupB = []
+		x2_max_pooled_output_groupB = []
+
+
+		all_type_x2_pools_groupA =[]
+		all_type_x1_pools_groupA =[]
+
+		all_type_x2_pools_groupB =[]
+		all_type_x1_pools_groupB =[]
+
+		for i, filter_size in enumerate(arg_config.filter_sizes): # filter_size-> [1, 2, 3]
+			with tf.variable_scope("block_A-%s" % filter_size):
+				with tf.name_scope("embedded_x1_expanded_blockA"):
+					x1_avgpooled, x1_maxpooled, x1_minpooled = \
+							self.group_A(filter_size, arg_config.embedding_size, \
+										arg_config.num_filters, self.x1_embedding_expand, \
+										arg_config.max_length) # [batch_size, num_filters]
+
+				with tf.name_scope("embedded_x2_expanded_blockA"):
+					x2_avgpooled, x2_maxpooled, x2_minpooled = \
+							self.group_A(filter_size, arg_config.embedding_size, \
+										arg_config.num_filters, self.x2_embedding_expand, \
+										arg_config.max_length, reuse_flag = True) # [batch_size, num_filters]
+			
+				x1_avg_pooled_output_groupA.append(x1_avgpooled)
+				x1_max_pooled_output_groupA.append(x1_maxpooled)
+				x1_min_pooled_output_groupA.append(x1_minpooled)
+				x2_avg_pooled_output_groupA.append(x2_avgpooled)
+				x2_max_pooled_output_groupA.append(x2_maxpooled)
+				x2_min_pooled_output_groupA.append(x2_minpooled)
+				# each shape is [3, batch_size, num_filters]
+
+			with tf.variable_scope("block_B-%s" % filter_size):
+				x1_maxpool_perdimension = []
+				x1_minpool_perdimension = []
+				x2_maxpool_perdimension = []
+				x2_minpool_perdimension = []
+				for embedding_idx in range(arg_config.embedding_size):
+					embedded_x1_expanded_shape = tf.shape(self.x1_embedding_expand)
+					shape0 = embedded_x1_expanded_shape[0]
+					shape1 = embedded_x1_expanded_shape[1]
+					shape3 = embedded_x1_expanded_shape[3]
+					embedding_slice_x1 = tf.slice(self.x1_embedding_expand,[0, 0, embedding_idx, 0], [shape0, shape1, 1, shape3], name="embedding_slice")
+					# shape: [batch_size, max_length, 1, 1]
+					embedding_slice_x2 = tf.slice(self.x2_embedding_expand, [0, 0, embedding_idx, 0],[shape0, shape1, 1, shape3], name="embedding_slice")
+					# shape: [batch_size, max_length, 1, 1]
+					with tf.variable_scope("embedding_scope_%s" % embedding_idx):
+						_, x1_maxpooled, x1_minpooled = self.group_A(filter_size, 1, arg_config.num_filters, embedding_slice_x1, arg_config.max_length)
+						_, x2_maxpooled, x2_minpooled = self.group_A(filter_size, 1, arg_config.num_filters, embedding_slice_x2, arg_config.max_length, reuse_flag=True)
+
+					x1_maxpool_perdimension.append(x1_maxpooled)  # [embed_dim x (MB x Num_filter)]
+					x1_minpool_perdimension.append(x1_minpooled)
+
+					x2_maxpool_perdimension.append(x2_maxpooled)
+					x2_minpool_perdimension.append(x2_minpooled)
+					# shape:[embedding_size, batch_size, num_filters]
+
+				x1_max_pooled_output_groupB.append(tf.transpose(tf.stack(x1_maxpool_perdimension), perm=[1,0,2], name ="transpose_x1_maxpool_perdimension_102") )   #[types_of_filter_sizes x (MB x embed_dim x Num_filter)]
+				# after tf.stack: [embedding_size, batch_size, num_filters]
+				# after tf.transpose: [batch_size, embedding_size, num_filters]
+				# after append: [3, batch_size, embedding_size, num_filters]
+				x1_min_pooled_output_groupB.append(tf.transpose(tf.stack(x1_minpool_perdimension), perm=[1,0,2]) )
+
+				x2_max_pooled_output_groupB.append(tf.transpose(tf.stack(x2_maxpool_perdimension), perm=[1,0,2]) )
+				x2_min_pooled_output_groupB.append(tf.transpose(tf.stack(x2_minpool_perdimension), perm=[1,0,2]) )
+
+		all_type_x1_pools_groupA.append(x1_avg_pooled_output_groupA)
+		all_type_x1_pools_groupA.append(x1_max_pooled_output_groupA)
+		all_type_x1_pools_groupA.append(x1_min_pooled_output_groupA)
+
+		all_type_x2_pools_groupA.append(x2_avg_pooled_output_groupA)
+		all_type_x2_pools_groupA.append(x2_max_pooled_output_groupA)
+		all_type_x2_pools_groupA.append(x2_min_pooled_output_groupA)
+		# shape is [ types_of_poolings(3), types_of_filter_sizes(3), batch_size, num_filters]
+
+
+
+		all_type_x1_pools_groupB.append(x1_max_pooled_output_groupB)
+		all_type_x1_pools_groupB.append(x1_min_pooled_output_groupB)
+
+		all_type_x2_pools_groupB.append(x2_max_pooled_output_groupB)
+		all_type_x2_pools_groupB.append(x2_min_pooled_output_groupB)
+		# [types_of_poolings(2), types_of_filter_sizes(3), batch_size, embedding_size, num_filters]
+		
+
+
+
+
+	def group_A(self, filter_size, embedding_size, num_filters, embedding_expand, max_length, reuse_flag=False):
+		with tf.variable_scope("group_A_filters_biases", reuse=reuse_flag):
+			filter_shape = [filter_size, embedding_size, 1, num_filters]
+			filter_avgpool = tf.get_variable("filter_avgpool", filter_shape)
+			filter_minpool = tf.get_variable("filter_minpool", filter_shape)
+			filter_maxpool = tf.get_variable("filter_maxpool", filter_shape)
+
+			b_minpool = tf.get_variable("b_minpool", initializer=0.1*tf.ones([num_filters]))
+			b_maxpool = tf.get_variable("b_maxpool", initializer=0.1*tf.ones([num_filters]))
+			b_avgpool = tf.get_variable("b_avgpool", initializer=0.1*tf.ones([num_filters]))
+
+		conv_avgpool = tf.nn.conv2d(embedding_expand, \
+				filter_avgpool, \
+				strides=[1, 1, 1, 1], \
+				padding='VALID', \
+				name="conv_avgpool") # shape: [batch_size, max_length-filter_size+1, 1, num_filters]
+		h_avgpool = tf.nn.tanh(tf.nn.bias_add(conv_avgpool, b_avgpool), name="tanh_avgpool")
+
+		avgpooled = tf.nn.avg_pool(h_avgpool, \
+			ksize=[1, max_length-filter_size+1, 1, 1], \
+			strides=[1, 1, 1, 1], \
+			padding='VALID', \
+			name="avgpool") # shape: [batch_size, 1, 1, num_filters]
+
+		conv_maxpool = tf.nn.conv2d(embedding_expand, \
+				filter_maxpool, \
+				strides=[1, 1, 1, 1], \
+				padding='VALID', \
+				name="conv_maxpool") # shape: [batch_size, max_length-filter_size+1, 1, num_filters]
+		h_maxpool = tf.nn.tanh(tf.nn.bias_add(conv_maxpool, b_maxpool), name="tanh_maxpool")
+
+		maxpooled = tf.nn.max_pool(h_maxpool, \
+			ksize=[1, max_length-filter_size+1, 1, 1], \
+			strides=[1, 1, 1, 1], \
+			padding='VALID', \
+			name="maxpool") # shape: [batch_size, 1, 1, num_filters]
+
+		conv_minpool = tf.nn.conv2d(embedding_expand, \
+				filter_minpool, \
+				strides=[1, 1, 1, 1], \
+				padding='VALID', \
+				name="conv_minpool") # shape: [batch_size, max_length-filter_size+1, 1, num_filters]
+		h_minpool = tf.nn.tanh(tf.nn.bias_add(conv_minpool, b_minpool), name="tanh_minpool")
+
+		minpooled = -tf.nn.max_pool(-h_minpool, \
+			ksize=[1, max_length-filter_size+1, 1, 1], \
+			strides=[1, 1, 1, 1], \
+			padding='VALID', \
+			name="minpool") # shape: [batch_size, 1, 1, num_filters]
+
+		avgpooled_squeezed = tf.squeeze(avgpooled, axis = [1,2]) # shape is (batch_size x num_Filters)
+		maxpooled_squeezed = tf.squeeze(maxpooled, axis = [1,2])
+		minpooled_squeezed = tf.squeeze(minpooled, axis = [1,2])
+
+		return avgpooled_squeezed, maxpooled_squeezed, minpooled_squeezed
+
+
+
+
+
