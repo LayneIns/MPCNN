@@ -110,7 +110,7 @@ class MPCNN:
 		all_type_x2_pools_groupB.append(x2_max_pooled_output_groupB)
 		all_type_x2_pools_groupB.append(x2_min_pooled_output_groupB)
 		# [types_of_poolings(2), types_of_filter_sizes(3), batch_size, embedding_size, num_filters]
-		
+
 
 
 
@@ -172,6 +172,23 @@ class MPCNN:
 		return avgpooled_squeezed, maxpooled_squeezed, minpooled_squeezed
 
 
+	def algorithm(self, all_type_x1_pools_groupA, all_type_x2_pools_groupA):
+		with tf.name_scope("algorithm_1"):
+			feah = []
+			for p in range(len(all_type_x1_pools_groupA)):
+				x1_sentences_stacked = tf.stack(all_type_x1_pools_groupA[p], name="stack_x1_sentences")
+				# shape [types_of_filters_sizes, batch_size, num_filters]
+				x1_sentences_stacked = tf.transpose(x1_sentences_stacked, perm=[1,2,0])
+				# shape [batch_size, num_filters, types_of_filters_sizes]
+				x2_sentences_stacked = tf.stack(all_type_x2_pools_groupA[p], name="stack_x2_sentences")
+				x2_sentences_stacked = tf.transpose(x2_sentences_stacked, perm=[1,2,0])
+				x1_sentence_normalised = self.normalise(x1_sentences_stacked)
+				x2_sentence_normalised = self.normalise(x2_sentences_stacked)
 
+	def normalise(self, a):
+		with tf.name_scope("normalise"):
+			norm_of_a = tf.norm(a, axis=-1)
+			norm_of_a = tf.expand_dims(norm_of_a,-1)
+		return tf.divide(a, norm_of_a)
 
 
