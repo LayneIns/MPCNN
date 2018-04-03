@@ -3,6 +3,7 @@
 import utils
 import numpy as np 
 import data
+import train
 
 if __name__ == "__main__":
 	
@@ -31,3 +32,6 @@ if __name__ == "__main__":
 
 	training_data_mgr = data.dataMgr(x1_train, x2_train, label_train)
 	
+	arg_config = data.argConfig(max_document_length, len(word_dict))
+
+	train.train(arg_config, training_data_mgr)

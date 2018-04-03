@@ -111,7 +111,57 @@ class MPCNN:
 		all_type_x2_pools_groupB.append(x2_min_pooled_output_groupB)
 		# [types_of_poolings(2), types_of_filter_sizes(3), batch_size, embedding_size, num_filters]
 
+		feah = self.algorithm_1(all_type_x1_pools_groupA, all_type_x2_pools_groupA)
+		# shape [batch_size, 3*num_filters*2]
 
+		feaa,feab = self.algorithm_2(all_type_x1_pools_groupA, all_type_x2_pools_groupA, all_type_x1_pools_groupB, all_type_x2_pools_groupB)
+		# shape [batch_size, 3*ws1*ws2*3] 
+		# shape [batch_size, 2*ws1*3*num_filters]
+
+		number_of_filter_windows = len(arg_config.filter_sizes)
+		fea_shape_1 =int( (3*2*num_filters_A) + \
+							(3*number_of_filter_windows*number_of_filter_windows*3) + \
+							(2*number_of_filter_windows*arg_config.num_filters*3)
+						)
+
+		fea = tf.concat([feah,feaa,feab],-1)
+		# shape [batch_size, fea_shape_1]
+
+		weights = {
+			'hidden1': tf.get_variable("hidden1_w",[fea_shape_1, hidden_num_units]),
+			'hidden2': tf.get_variable("hidden2_w",[hidden_num_units, hidden_num_units]),
+			'output': tf.get_variable("output_w",[hidden_num_units, output_num_units]),
+		}
+
+		biases = {
+			'hidden1': tf.get_variable("hidden1_b",[hidden_num_units]),
+			'hidden2': tf.get_variable("hidden2_b",[hidden_num_units]),
+			'output': tf.get_variable("output_b",[output_num_units])
+		}
+
+		hidden_layer1 = tf.add(tf.matmul(fea, weights['hidden1']), biases['hidden1'])
+		activated_hidden_layer1 = tf.tanh(hidden_layer1)
+		hidden_layer2 = tf.add(tf.matmul(activated_hidden_layer1, weights['hidden2']), biases['hidden2'])
+		activated_hidden_layer2 = tf.tanh(hidden_layer2)
+
+		with tf.name_scope("output"):
+			self.scores = tf.nn.xw_plus_b(activated_hidden_layer2, weights['output'], biases['output'], name="scores")
+			self.predictions = tf.argmax(self.scores, 1, name="predictions")
+
+		# CalculateMean cross-entropy loss
+		with tf.name_scope("loss"):
+			losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.scores, labels=self.input_y)
+			self.loss = tf.reduce_mean(losses) 
+
+		# Accuracy
+		with tf.name_scope("accuracy"):
+			correct_predictions = tf.equal(self.predictions, tf.argmax(self.input_y, 1))
+			self.accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"), name="accuracy")
+
+		self.optimizer = tf.train.AdamOptimizer(learning_rate=arg_config.learning_rate)
+		self.train_op = self.optimizer.minimize(self.loss)		
+		
+		self.init = tf.global_variables_initializer()
 
 
 
@@ -172,7 +222,7 @@ class MPCNN:
 		return avgpooled_squeezed, maxpooled_squeezed, minpooled_squeezed
 
 
-	def algorithm(self, all_type_x1_pools_groupA, all_type_x2_pools_groupA):
+	def algorithm_1(self, all_type_x1_pools_groupA, all_type_x2_pools_groupA):
 		with tf.name_scope("algorithm_1"):
 			feah = []
 			for p in range(len(all_type_x1_pools_groupA)):
@@ -184,11 +234,80 @@ class MPCNN:
 				x2_sentences_stacked = tf.transpose(x2_sentences_stacked, perm=[1,2,0])
 				x1_sentence_normalised = self.normalise(x1_sentences_stacked)
 				x2_sentence_normalised = self.normalise(x2_sentences_stacked)
+				# shape: [batch_size, num_filters, types_of_filters_sizes]
+
+
+				cosine_dis = tf.squeeze(cosine_distance(x1_sentence_normalised, x2_sentence_normalised, dim=-1), axis=-1)
+				# shape [batch_size, num_filters]
+				l2diff = tf.sqrt(tf.reduce_sum(tf.square(tf.clip_by_value(tf.subtract(x1_sentences_stacked, x2_sentences_stacked, name="subtract_inp1_inp2"), 1e-7, 1e+10)), axis=-1))
+				feah.append(tf.concat([cosine_dis, l2diff], axis=-1))
+				# after loop: shape [3, batch_size, num_filters * 2]
+
+
+			feah_tensor = tf.transpose(tf.stack(feah), [1, 0, 2])
+			# shape [batch_size, 3, num_filters * 2]
+			feah_tensor = tf.reshape(feah_tensor, [tf.shape(feah_tensor)[0], -1])
+			# shape [batch_size, 3*num_filters*2]
+		return feah_tensor
+
+	def algorithm_2(self, Ga_inp1_sentences, Ga_inp2_sentences, Gb_inp1_sentences, Gb_inp2_sentences):
+		# shape is [ 3, 3, batch_size, num_filters]
+		# [ 2, 3, batch_size, embedding_size, num_filters]
+		with tf.name_scope("Algo2"):
+			feaa = []
+			feab = []
+			for p in range(len(Ga_inp1_sentences)):  # for each pooling type p:
+				for ws1 in range(len(Ga_inp1_sentences[p])):
+					oG1a = Ga_inp1_sentences[p][ws1] #shape is MB xNum_Filters_for_each_size
+					for ws2 in range(len(Ga_inp2_sentences[p])):
+						oG2a = Ga_inp2_sentences[p][ws2] #shape is MB xNum_Filters_for_each_size
+						oG1a_normalised = self.normalise(oG1a)
+						oG2a_normalised = self.normalise(oG2a)
+
+						displacement  = tf.sqrt(tf.reduce_sum(tf.square(tf.clip_by_value(tf.subtract(oG1a, oG2a),1e-7,1e+10)), -1, keep_dims=True))
+						cd = cosine_distance(oG1a_normalised, oG2a_normalised, dim=-1)
+						l2diff = tf.expand_dims(tf.sqrt(tf.reduce_sum(tf.square(tf.clip_by_value(tf.subtract(oG1a, oG2a), 1e-7, 1e+10)), axis=-1)),-1)
+						feaa.append(tf.concat([cd, l2diff,displacement], axis=-1))
+
+			for p2 in range(len(Gb_inp1_sentences)):  # for each pooling type p2:
+				for ws1 in range(len(Gb_inp1_sentences[p2])):
+					oG1b = Gb_inp1_sentences[p2][ws1] #shape is MB x embed_dim x Num_filter
+					oG2b = Gb_inp2_sentences[p2][ws1] 
+					oG1b = tf.transpose(oG1b,[0,2,1]) #shape is MB x Num_filter x embed_dim
+					oG2b = tf.transpose(oG2b,[0,2,1])
+					oG1b_normalised = self.normalise(oG1b)
+					oG2b_normalised = self.normalise(oG2b)
+					displacement2 = tf.sqrt(tf.reduce_sum(tf.square(tf.clip_by_value(tf.subtract(oG1b,oG2b),1e-7,1e+10)), -1))	#  MB x Num_filter
+					cd2 = tf.squeeze(cosine_distance(oG1b_normalised, oG2b_normalised, dim=-1), axis=[-1])  #  MB x Num_filter
+					l2diff2 = tf.sqrt(tf.reduce_sum(tf.square(tf.clip_by_value(tf.subtract(oG1b,oG2b),1e-7,1e+10)), axis=-1))	#  MB x Num_filter
+					feab.append(tf.concat([cd2, l2diff2,displacement2],axis=-1))
+
+
+			feaa_tensor = tf.stack(feaa)  
+			feaa_tensor = tf.transpose(tf.stack(feaa),[1,0,2])  # MB x (p*ws1*ws2) x 3
+			feaa_tensor = tf.reshape(feaa_tensor,[tf.shape(feaa_tensor)[0],-1]) # MB x (p*ws1*ws2*3)
+
+			feab_tensor = tf.stack(feab)  #(p2*ws1)  x MB x (3*Num_filter)
+			feab_tensor = tf.transpose(tf.stack(feab),[1,0,2])  #MB x (p2*ws1) x (3*Num_filter)
+			feab_tensor = tf.reshape(feab_tensor,[tf.shape(feab_tensor)[0],-1])  #MB x (p2*ws1*3*Num_filter)
+		
+		return feaa_tensor,feab_tensor
+
+
+
 
 	def normalise(self, a):
 		with tf.name_scope("normalise"):
-			norm_of_a = tf.norm(a, axis=-1)
-			norm_of_a = tf.expand_dims(norm_of_a,-1)
+			norm_of_a = tf.norm(a, axis=-1) # shape: [batch_size, num_filters]
+			norm_of_a = tf.expand_dims(norm_of_a,-1) # shape: [batch_size, num_filters, 1]
 		return tf.divide(a, norm_of_a)
 
 
+def cosine_similarity(labels, predictions, dim=None):
+
+	predictions = tf.to_float(predictions)
+	labels = tf.to_float(labels)
+	# predictions.get_shape().assert_is_compatible_with(labels.get_shape())
+	radial_diffs = tf.multiply(predictions, labels)
+	losses = 1 - tf.reduce_sum(radial_diffs, axis=(dim,), keep_dims=True)
+	return losses

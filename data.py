@@ -12,6 +12,8 @@ class argConfig:
 		self.embedding_size = 300
 		self.filter_sizes = [1, 2, 3]
 		self.num_filters = 128
+		self.learning_rate = 0.001
+		self.batch_size = 32
 
 class dataMgr:
 

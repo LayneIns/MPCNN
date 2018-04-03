@@ -1,7 +1,7 @@
 # coding: utf-8
 
 import numpy as np 
-import re
+import re, sys
 
 def clean_str(string):
 	string = re.sub(r"[^A-Za-z0-9(),!?\'\`_]", " ", string)
@@ -27,6 +27,11 @@ def loadDataAndLabels(filepath):
 	k = 0
 	with open(filepath) as training_file:
 		for line in training_file:
+			sys.stdout.write(" "*10 + "\r")
+			sys.stdout.flush()
+			sys.stdout.write(str(k) + "\r")
+			sys.stdout.flush()
+			k += 1
 			parts = line.split('$$') #The two sentences and the similarity score are seperated by $$ delimiter
 			list_of_sentences1.append(parts[0].strip())
 			list_of_sentences2.append(parts[1].strip())
