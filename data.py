@@ -14,10 +14,11 @@ class argConfig:
 		self.num_filters = 128
 		self.learning_rate = 0.001
 		self.batch_size = 32
+		self.hidden_num_units = 512
 
 class dataMgr:
 
-	def __init__(self, text1, texe2, label):
+	def __init__(self, text1, text2, label):
 		self.text1 = text1
 		self.text2 = text2
 		self.label = label
@@ -34,7 +35,7 @@ class dataMgr:
 			label = self.label[self.batch_cnt: self.batch_cnt+batch_size]
 
 			self.batch_cnt += batch_size
-		else self.batch_cnt < self.total_batch:
+		elif self.batch_cnt < self.total_batch:
 			text1 = self.text1[self.batch_cnt: ]
 			text2 = self.text2[self.batch_cnt: ]
 			label = self.label[self.batch_cnt: ]

@@ -119,7 +119,7 @@ class MPCNN:
 		# shape [batch_size, 2*ws1*3*num_filters]
 
 		number_of_filter_windows = len(arg_config.filter_sizes)
-		fea_shape_1 =int( (3*2*num_filters_A) + \
+		fea_shape_1 =int( (3*2*arg_config.num_filters) + \
 							(3*number_of_filter_windows*number_of_filter_windows*3) + \
 							(2*number_of_filter_windows*arg_config.num_filters*3)
 						)
@@ -128,15 +128,15 @@ class MPCNN:
 		# shape [batch_size, fea_shape_1]
 
 		weights = {
-			'hidden1': tf.get_variable("hidden1_w",[fea_shape_1, hidden_num_units]),
-			'hidden2': tf.get_variable("hidden2_w",[hidden_num_units, hidden_num_units]),
-			'output': tf.get_variable("output_w",[hidden_num_units, output_num_units]),
+			'hidden1': tf.get_variable("hidden1_w",[fea_shape_1, arg_config.hidden_num_units]),
+			'hidden2': tf.get_variable("hidden2_w",[arg_config.hidden_num_units, arg_config.hidden_num_units]),
+			'output': tf.get_variable("output_w",[arg_config.hidden_num_units, arg_config.num_classes]),
 		}
 
 		biases = {
-			'hidden1': tf.get_variable("hidden1_b",[hidden_num_units]),
-			'hidden2': tf.get_variable("hidden2_b",[hidden_num_units]),
-			'output': tf.get_variable("output_b",[output_num_units])
+			'hidden1': tf.get_variable("hidden1_b",[arg_config.hidden_num_units]),
+			'hidden2': tf.get_variable("hidden2_b",[arg_config.hidden_num_units]),
+			'output': tf.get_variable("output_b",[arg_config.num_classes])
 		}
 
 		hidden_layer1 = tf.add(tf.matmul(fea, weights['hidden1']), biases['hidden1'])
@@ -150,12 +150,12 @@ class MPCNN:
 
 		# CalculateMean cross-entropy loss
 		with tf.name_scope("loss"):
-			losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.scores, labels=self.input_y)
+			losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.scores, labels=self.label)
 			self.loss = tf.reduce_mean(losses) 
 
 		# Accuracy
 		with tf.name_scope("accuracy"):
-			correct_predictions = tf.equal(self.predictions, tf.argmax(self.input_y, 1))
+			correct_predictions = tf.equal(self.predictions, tf.argmax(self.label, 1))
 			self.accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"), name="accuracy")
 
 		self.optimizer = tf.train.AdamOptimizer(learning_rate=arg_config.learning_rate)
@@ -303,7 +303,7 @@ class MPCNN:
 		return tf.divide(a, norm_of_a)
 
 
-def cosine_similarity(labels, predictions, dim=None):
+def cosine_distance(labels, predictions, dim=None):
 
 	predictions = tf.to_float(predictions)
 	labels = tf.to_float(labels)
