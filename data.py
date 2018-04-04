@@ -24,6 +24,7 @@ class dataMgr:
 		self.label = label
 		self.total_batch = len(text1)
 		self.batch_cnt = 0
+		self.case_num = self.build_case_num(label)
 
 	def initialize_batch_cnt(self):
 		self.batch_cnt = 0
@@ -44,3 +45,15 @@ class dataMgr:
 		
 
 		return text1, text2, label
+
+	def build_case_num(self, label):
+		case_num = []
+		cnt = 1
+		for i in range(1, len(label)):
+			if label[i][1] == 1:
+				case_num.append(cnt)
+				cnt = 1
+			else:
+				cnt += 1
+		case_num.append(cnt)
+		return case_num
