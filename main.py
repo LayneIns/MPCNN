@@ -5,6 +5,7 @@ import numpy as np
 import data
 import train
 
+
 if __name__ == "__main__":
 	
 	print "Start to read training data..."
@@ -32,10 +33,32 @@ if __name__ == "__main__":
 
 	training_data_mgr = data.dataMgr(x1_train, x2_train, label_train)
 	
+
+	# ==========================================
+	print "Start to read valid data..."
+	valid_filepath = "./data/valid.txt"
+	x1_text, x2_text, label_train = utils.loadDataAndLabels(training_filepath)
+	print "There are", len(label_train), "cases in the validation set."
+	print "\n"
+
+	x_combined = x1_text + x2_text
+
+	print "Start to get one hot representation..."
+	x_combined_vec = utils.convert(x_combined, word_dict, max_document_length)
+	x1_train = np.asarray(x_combined_vec[:int(len(x_combined_vec)/2)])
+	x2_train = np.asarray(x_combined_vec[int(len(x_combined_vec)/2):])
+	print "\n"
+
+	valid_data_mgr = data.dataMgr(x1_train, x2_train, label_train)
+	# ==========================================
+
+
+
+
 	arg_config = data.argConfig(max_document_length, len(word_dict))
 	# print training_data_mgr.case_num[0:10]
 	# print training_data_mgr.case_num[-10:]
 	# print len(training_data_mgr.case_num)
 	# raw_input()
 
-	train.train(arg_config, training_data_mgr)
+	train.train(arg_config, training_data_mgr, valid_data_mgr)
