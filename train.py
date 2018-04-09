@@ -49,12 +49,12 @@ def train(arg_config, training_data_mgr, valid_data_mgr, testing_data_mgr):
 				print "training --- epoch number:", str(i), ", batch:", str(j), ", loss:", str(loss), ", accuracy:", acc
 				
 
-				if j % (arg_config.batch_size * 60) == 0:
+				if j % (arg_config.batch_size * 120) == 0:
 					total_score_list = []
 					total_label = []
 					valid_data_mgr.initialize_batch_cnt()
-					for k in range(0, valid_data_mgr.total_batch, 128):
-						text1, text2, label = valid_data_mgr.next_batch(128)
+					for k in range(0, valid_data_mgr.total_batch, 64):
+						text1, text2, label = valid_data_mgr.next_batch(64)
 						total_label.extend(label.tolist())
 						scores = sess.run(train_model.scores, feed_dict={train_model.x1_input: text1, train_model.x2_input: text2, train_model.label: label})
 						total_score_list.extend(scores.tolist())
@@ -64,17 +64,17 @@ def train(arg_config, training_data_mgr, valid_data_mgr, testing_data_mgr):
 					print "Validation accuracy:", float(right_case_number)/total_case_number
 
 
-					with open("./result/res.txt", "a") as fout:
+					with open("./result/res_1.txt", "a") as fout:
 						line1 = "Validation: There are " + str(total_case_number) + " cases in the validation set, " + str(right_case_number) + "cases are right.\n"
 						line2 = "Validation accuracy:" + str(float(right_case_number)/total_case_number) + "\n"
 						fout.write((line1+ line2 + "\n").encode('utf-8'))
 
-				if j % (arg_config.batch_size * 60) == 0:
+				if j % (arg_config.batch_size * 120) == 0:
 					total_score_list = []
 					total_label = []
 					testing_data_mgr.initialize_batch_cnt()
-					for k in range(0, testing_data_mgr.total_batch, 128):
-						text1, text2, label = testing_data_mgr.next_batch(128)
+					for k in range(0, testing_data_mgr.total_batch, 64):
+						text1, text2, label = testing_data_mgr.next_batch(64)
 						total_label.extend(label.tolist())
 						scores = sess.run(train_model.scores, feed_dict={train_model.x1_input: text1, train_model.x2_input: text2, train_model.label: label})
 						total_score_list.extend(scores.tolist())
@@ -84,7 +84,7 @@ def train(arg_config, training_data_mgr, valid_data_mgr, testing_data_mgr):
 					print "Testing accuracy:", float(right_case_number)/total_case_number
 
 
-					with open("./result/res.txt", "a") as fout:
+					with open("./result/res_1.txt", "a") as fout:
 						line1 = "Testing: There are " + str(total_case_number) + " cases in the testing set, " + str(right_case_number) + "cases are right.\n"
 						line2 = "Testing accuracy:" + str(float(right_case_number)/total_case_number) + "\n"
 						fout.write((line1+ line2 + "\n").encode('utf-8'))
