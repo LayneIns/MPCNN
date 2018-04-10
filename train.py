@@ -2,6 +2,7 @@
 
 import tensorflow as tf 
 import model
+import random
 
 
 def calculateAccuracy(score_list, label_list):
@@ -13,8 +14,12 @@ def calculateAccuracy(score_list, label_list):
 			if len(one_case) == 1:
 				right_case_number += 1
 			elif len(one_case) > 1:
-				if one_case.index(max(one_case)) == 0:
+				if one_case.index(max(one_case)) == 0 and one_case.count(max(one_case)) == 1:
 					right_case_number += 1
+				elif one_case.index(max(one_case)) == 0 and one_case.count(max(one_case)) > 1:
+					rand_int = random.randint(0, one_case.count(max(one_case))-1)
+					if rand_int == 0:
+						right_case_number += 1
 			elif len(one_case) == 0:
 				pass
 			total_case_number += 1
@@ -25,8 +30,12 @@ def calculateAccuracy(score_list, label_list):
 	if len(one_case) == 1:
 		right_case_number += 1
 	elif len(one_case) > 1:
-		if one_case.index(max(one_case)) == 0:
+		if one_case.index(max(one_case)) == 0 and one_case.count(max(one_case)) == 1:
 			right_case_number += 1
+		elif one_case.index(max(one_case)) == 0 and one_case.count(max(one_case)) > 1:
+			rand_int = random.randint(0, one_case.count(max(one_case))-1)
+			if rand_int == 0:
+				right_case_number += 1
 
 	return total_case_number, right_case_number
 
@@ -64,30 +73,31 @@ def train(arg_config, training_data_mgr, valid_data_mgr, testing_data_mgr):
 					print "Validation accuracy:", float(right_case_number)/total_case_number
 
 
-					with open("./result/res_1.txt", "a") as fout:
-						line1 = "Validation: There are " + str(total_case_number) + " cases in the validation set, " + str(right_case_number) + "cases are right.\n"
+					with open("./result/res_2.txt", "a") as fout:
+						line = "training --- epoch number: " + str(i) + ", batch: " + str(j) + "\n"
+						line1 = "Validation: There are " + str(total_case_number) + " cases in the validation set, " + str(right_case_number) + " cases are right.\n"
 						line2 = "Validation accuracy:" + str(float(right_case_number)/total_case_number) + "\n"
-						fout.write((line1+ line2 + "\n").encode('utf-8'))
+						fout.write((line + line1+ line2 + "\n").encode('utf-8'))
 
-				if j % (arg_config.batch_size * 120) == 0:
-					total_score_list = []
-					total_label = []
-					testing_data_mgr.initialize_batch_cnt()
-					for k in range(0, testing_data_mgr.total_batch, 64):
-						text1, text2, label = testing_data_mgr.next_batch(64)
-						total_label.extend(label.tolist())
-						scores = sess.run(train_model.scores, feed_dict={train_model.x1_input: text1, train_model.x2_input: text2, train_model.label: label})
-						total_score_list.extend(scores.tolist())
+			total_score_list = []
+			total_label = []
+			testing_data_mgr.initialize_batch_cnt()
+			for k in range(0, testing_data_mgr.total_batch, 64):
+				text1, text2, label = testing_data_mgr.next_batch(64)
+				total_label.extend(label.tolist())
+				scores = sess.run(train_model.scores, feed_dict={train_model.x1_input: text1, train_model.x2_input: text2, train_model.label: label})
+				total_score_list.extend(scores.tolist())
 
-					total_case_number, right_case_number = calculateAccuracy(total_score_list, total_label)
-					print "Testing: There are", total_case_number, "cases in the testing set,", right_case_number, "cases are right."
-					print "Testing accuracy:", float(right_case_number)/total_case_number
+			total_case_number, right_case_number = calculateAccuracy(total_score_list, total_label)
+			print "Testing: There are", total_case_number, "cases in the testing set,", right_case_number, "cases are right."
+			print "Testing accuracy:", float(right_case_number)/total_case_number
 
 
-					with open("./result/res_1.txt", "a") as fout:
-						line1 = "Testing: There are " + str(total_case_number) + " cases in the testing set, " + str(right_case_number) + "cases are right.\n"
-						line2 = "Testing accuracy:" + str(float(right_case_number)/total_case_number) + "\n"
-						fout.write((line1+ line2 + "\n").encode('utf-8'))
+			with open("./result/res_2.txt", "a") as fout:
+				line = "=========================================\nTesting: epoch: " + str(i) + "\n"
+				line1 = "Testing: There are " + str(total_case_number) + " cases in the testing set, " + str(right_case_number) + "cases are right.\n"
+				line2 = "Testing accuracy:" + str(float(right_case_number)/total_case_number) + "\n================================\n"
+				fout.write((line1+ line2 + "\n").encode('utf-8'))
 
 
 
