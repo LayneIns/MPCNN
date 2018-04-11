@@ -3,6 +3,8 @@
 import tensorflow as tf 
 import model
 import random
+from mpcnn2 import MPCNN
+import sys
 
 
 def calculateAccuracy(score_list, label_list):
@@ -41,31 +43,45 @@ def calculateAccuracy(score_list, label_list):
 
 
 def train(arg_config, training_data_mgr, valid_data_mgr, testing_data_mgr):
-	train_model = model.MPCNN(arg_config)
-	saver = tf.train.Saver(max_to_keep=1)
+	# train_model = model.MPCNN(arg_config)
+	train_model = MPCNN(arg_config.max_length, arg_config.max_length, arg_config.num_classes, arg_config.vocab_size,
+			arg_config.embedding_size, arg_config.filter_sizes, arg_config.num_filters, arg_config.num_filters)
+	
+	# saver = tf.train.Saver(max_to_keep=1)
 
 	with tf.Session() as sess:
 		
-		sess.run(train_model.init)
+		global_step = tf.Variable(0, name="global_step", trainable=False)
+		optimizer = tf.train.AdamOptimizer(1e-3)
+		grads_and_vars = optimizer.compute_gradients(train_model.loss)
+		train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
+
+		sess.run(tf.global_variables_initializer())
 
 		for i in range(arg_config.epoch_num):
 			training_data_mgr.initialize_batch_cnt()
 			for j in range(0, training_data_mgr.total_batch, arg_config.batch_size):
 				text1, text2, label = training_data_mgr.next_batch(arg_config.batch_size)
 
-				_, loss, acc, scores = sess.run([train_model.train_op, train_model.loss, train_model.accuracy, train_model.scores], feed_dict={train_model.x1_input: text1, train_model.x2_input: text2, train_model.label: label})
+				_, step, loss, acc= sess.run([train_op, global_step, train_model.loss, train_model.accuracy], feed_dict={train_model.input_x1: text1, train_model.input_x2: text2, train_model.input_y: label})
 
 				print "training --- epoch number:", str(i), ", batch:", str(j), ", loss:", str(loss), ", accuracy:", acc
 				
+				current_step = tf.train.global_step(sess, global_step)
 
-				if j % (arg_config.batch_size * 120) == 0:
+				if j % (arg_config.batch_size * 600) == 0:
 					total_score_list = []
 					total_label = []
 					valid_data_mgr.initialize_batch_cnt()
 					for k in range(0, valid_data_mgr.total_batch, 64):
+						sys.stdout.flush()
+						sys.stdout.write(" " + "\r")
+						sys.stdout.flush()
+						sys.stdout.write(str(k) + "/" + str(valid_data_mgr.total_batch) + "\r")
+
 						text1, text2, label = valid_data_mgr.next_batch(64)
 						total_label.extend(label.tolist())
-						scores = sess.run(train_model.scores, feed_dict={train_model.x1_input: text1, train_model.x2_input: text2, train_model.label: label})
+						scores = sess.run(train_model.scores, feed_dict={train_model.input_x1: text1, train_model.input_x2: text2, train_model.input_y: label})
 						total_score_list.extend(scores.tolist())
 
 					total_case_number, right_case_number = calculateAccuracy(total_score_list, total_label)
@@ -83,9 +99,14 @@ def train(arg_config, training_data_mgr, valid_data_mgr, testing_data_mgr):
 			total_label = []
 			testing_data_mgr.initialize_batch_cnt()
 			for k in range(0, testing_data_mgr.total_batch, 64):
+				sys.stdout.flush()
+				sys.stdout.write(" " + "\r")
+				sys.stdout.flush()
+				sys.stdout.write(str(k) + "/" + str(testing_data_mgr.total_batch) + "\r")
+
 				text1, text2, label = testing_data_mgr.next_batch(64)
 				total_label.extend(label.tolist())
-				scores = sess.run(train_model.scores, feed_dict={train_model.x1_input: text1, train_model.x2_input: text2, train_model.label: label})
+				scores = sess.run(train_model.scores, feed_dict={train_model.input_x1: text1, train_model.input_x2: text2, train_model.input_y: label})
 				total_score_list.extend(scores.tolist())
 
 			total_case_number, right_case_number = calculateAccuracy(total_score_list, total_label)
