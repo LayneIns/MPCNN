@@ -33,7 +33,6 @@ class MPCNN:
 
 		all_type_x2_pools_groupA =[]
 		all_type_x1_pools_groupA =[]
-
 		all_type_x2_pools_groupB =[]
 		all_type_x1_pools_groupB =[]
 
