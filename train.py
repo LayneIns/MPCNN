@@ -75,9 +75,9 @@ def train(arg_config, training_data_mgr, valid_data_mgr, testing_data_mgr):
 					valid_data_mgr.initialize_batch_cnt()
 					for k in range(0, valid_data_mgr.total_batch, 64):
 						sys.stdout.flush()
-						sys.stdout.write(" " + "\r")
+						sys.stdout.write(" " * 30 + "\r")
 						sys.stdout.flush()
-						sys.stdout.write(str(k) + "/" + str(valid_data_mgr.total_batch) + "\r")
+						sys.stdout.write("processing: " + str(k) + "/" + str(valid_data_mgr.total_batch) + "\r")
 
 						text1, text2, label = valid_data_mgr.next_batch(64)
 						total_label.extend(label.tolist())
