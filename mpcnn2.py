@@ -9,42 +9,6 @@ hidden_num_units = 512
 output_num_units = 2
 
 
-
-
-# def cosine_distance(
-#	 labels, predictions, dim=None, weights=1.0, scope=None,
-#	 loss_collection=ops.GraphKeys.LOSSES,
-#	 reduction=Reduction.SUM_BY_NONZERO_WEIGHTS):
-#   """Adds a cosine-distance loss to the training procedure.
-#   Note that the function assumes that `predictions` and `labels` are already
-#   unit-normalized.
-#   Args:
-#	 labels: `Tensor` whose shape matches 'predictions'
-#	 predictions: An arbitrary matrix.
-#	 dim: The dimension along which the cosine distance is computed.
-#	 weights: Optional `Tensor` whose rank is either 0, or the same rank as
-#	   `labels`, and must be broadcastable to `labels` (i.e., all dimensions must
-#	   be either `1`, or the same as the corresponding `losses` dimension).
-#	 scope: The scope for the operations performed in computing the loss.
-#	 loss_collection: collection to which this loss will be added.
-#	 reduction: Type of reduction to apply to loss.
-#   Returns:
-#	 Weighted loss float `Tensor`. If `reduction` is `NONE`, this has the same
-#	 shape as `labels`; otherwise, it is scalar.
-#   Raises:
-#	 ValueError: If `predictions` shape doesn't match `labels` shape, or
-#	   `weights` is `None`.
-#   """
-#   if dim is None:
-#	 raise ValueError("`dim` cannot be None.")
-#   with ops.name_scope(scope, "cosine_distance",(predictions, labels, weights)) as scope:
-#	 predictions = math_ops.to_float(predictions)
-#	 labels = math_ops.to_float(labels)
-#	 predictions.get_shape().assert_is_compatible_with(labels.get_shape())
-#	 radial_diffs = math_ops.multiply(predictions, labels)
-#	 losses = 1 - math_ops.reduce_sum(radial_diffs, axis=(dim,), keep_dims=True)
-#	 return losses
-
 def cosine_distance(labels, predictions, dim=None):
 
 	predictions = tf.to_float(predictions)
@@ -68,8 +32,7 @@ class MPCNN(object):
 				W = tf.get_variable("W",[vocab_size,embedding_size])
 
 				self.embedded_chars_inp1 = tf.nn.embedding_lookup(W, self.input_x1,name ="embedded_chars_inp1")
-				self.embedded_chars_inp1_expanded = tf.expand_dims(self.embedded_chars_inp1, axis=-1, name="embedded_chars_inp1_expanded") #conv2d needs 4d tensor of shape [batch, width(inp1_seq_len),
-																					   #height(embedding_size), channel(adding artifically here)].
+				self.embedded_chars_inp1_expanded = tf.expand_dims(self.embedded_chars_inp1, axis=-1, name="embedded_chars_inp1_expanded") #conv2d needs 4d tensor of shape [batch, width(inp1_seq_len), #height(embedding_size), channel(adding artifically here)].
 				
 				self.embedded_chars_inp2 = tf.nn.embedding_lookup(W, self.input_x2,name="embedded_chars_inp2")
 				self.embedded_chars_inp2_expanded = tf.expand_dims(self.embedded_chars_inp2, axis=-1, name="embedded_chars_inp2_expanded") #conv2d needs 4d tensor of shape [batch, width(inp1_seq_len), height(embedding_size), channel(adding artifically here)].
@@ -97,12 +60,10 @@ class MPCNN(object):
 		for i, filter_size in enumerate(filter_sizes):
 			with tf.variable_scope("BlockA-%s" % filter_size):
 				with tf.name_scope("embedded_chars_inp1_expanded"):
-					inp1_avgpooled, inp1_maxpooled, inp1_minpooled = self.groupa(filter_size, embedding_size, num_filters_A, self.embedded_chars_inp1_expanded,
-															 inp1_sequence_length)
+					inp1_avgpooled, inp1_maxpooled, inp1_minpooled = self.groupa(filter_size, embedding_size, num_filters_A, self.embedded_chars_inp1_expanded, inp1_sequence_length)
 				# shape of inp1_avgpooled is (MB x Num_Filters_for_each_size)
 				with tf.name_scope("embedded_chars_inp2_expanded"):
-					inp2_avgpooled, inp2_maxpooled, inp2_minpooled = self.groupa(filter_size, embedding_size, num_filters_A, self.embedded_chars_inp2_expanded,
-															 inp2_sequence_length,reuse_flag = True)
+					inp2_avgpooled, inp2_maxpooled, inp2_minpooled = self.groupa(filter_size, embedding_size, num_filters_A, self.embedded_chars_inp2_expanded, inp2_sequence_length,reuse_flag = True)
 
 				inp1_avgpooled_outputs_groupA.append(inp1_avgpooled) #shape is [types_of_filter_sizes x MB x Num_Filters_for_each_size]
 				inp1_maxpooled_outputs_groupA.append(inp1_maxpooled)
