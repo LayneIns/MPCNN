@@ -9,7 +9,7 @@ class MPCNN:
 		self.label = tf.placeholder(tf.float32, [None, arg_config.num_classes], name="label") # [batch_size, num_classses]
 
 		with tf.variable_scope("embedding_layer"):
-			W = tf.get_variable("W", [arg_config.vocab_size, arg_config.embedding_size])
+			W = tf.get_variable("W", [arg_config.vocab_size, arg_config.embedding_size], initializer=tf.random_normal_initializer(mean=0, stddev=1))
 			self.x1_embedding = tf.nn.embedding_lookup(W, self.x1_input, name="x1_embedding") # [batch_size, max_length, embedding_size]
 			self.x2_embedding = tf.nn.embedding_lookup(W, self.x2_input, name="x2_embedding") # [batch_size, max_length, embedding_size]
 
