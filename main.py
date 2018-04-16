@@ -10,6 +10,7 @@ if __name__ == "__main__":
 	
 	print "Start to read training data..."
 	training_filepath = "./data/training.txt"
+	# training_filepath = "./chinese_data/training.txt"
 	x1_text, x2_text, label_train = utils.loadDataAndLabels(training_filepath)
 	print "\n"
 
@@ -37,6 +38,7 @@ if __name__ == "__main__":
 	# ==========================================
 	print "Start to read valid data..."
 	valid_filepath = "./data/valid.txt"
+	# valid_filepath = "./chinese_data/valid.txt"
 	x1_text, x2_text, label_valid = utils.loadDataAndLabels(valid_filepath)
 	print "There are", len(label_valid), "cases in the validation set."
 	print "\n"
@@ -52,6 +54,7 @@ if __name__ == "__main__":
 	valid_data_mgr = data.dataMgr(x1_train, x2_train, label_valid)
 	# ==========================================
 
+	
 	# ==========================================
 	print "Start to read testing data..."
 	testing_filepath = "./data/testing.txt"
@@ -69,7 +72,7 @@ if __name__ == "__main__":
 
 	testing_data_mgr = data.dataMgr(x1_train, x2_train, label_test)
 	# ==========================================
-
+	
 
 
 
@@ -81,3 +84,4 @@ if __name__ == "__main__":
 	# raw_input()
 
 	train.train(arg_config, training_data_mgr, valid_data_mgr, testing_data_mgr)
+	# train.train(arg_config, training_data_mgr, valid_data_mgr)

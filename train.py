@@ -4,7 +4,6 @@ import tensorflow as tf
 import model
 import random
 from mpcnn2 import MPCNN
-import sys
 
 
 def calculateAccuracy(score_list, label_list):
@@ -43,9 +42,10 @@ def calculateAccuracy(score_list, label_list):
 
 
 def train(arg_config, training_data_mgr, valid_data_mgr, testing_data_mgr):
-	# train_model = model.MPCNN(arg_config)
-	train_model = MPCNN(arg_config.max_length, arg_config.max_length, arg_config.num_classes, arg_config.vocab_size,
-			arg_config.embedding_size, arg_config.filter_sizes, arg_config.num_filters, arg_config.num_filters)
+# def train(arg_config, training_data_mgr, valid_data_mgr):
+	train_model = model.MPCNN(arg_config)
+	# train_model = MPCNN(arg_config.max_length, arg_config.max_length, arg_config.num_classes, arg_config.vocab_size,
+	# 		arg_config.embedding_size, arg_config.filter_sizes, arg_config.num_filters, arg_config.num_filters)
 	
 	# saver = tf.train.Saver(max_to_keep=1)
 
@@ -63,7 +63,8 @@ def train(arg_config, training_data_mgr, valid_data_mgr, testing_data_mgr):
 			for j in range(0, training_data_mgr.total_batch, arg_config.batch_size):
 				text1, text2, label = training_data_mgr.next_batch(arg_config.batch_size)
 
-				_, step, loss, acc= sess.run([train_op, global_step, train_model.loss, train_model.accuracy], feed_dict={train_model.input_x1: text1, train_model.input_x2: text2, train_model.input_y: label})
+				# _, step, loss, acc= sess.run([train_op, global_step, train_model.loss, train_model.accuracy], feed_dict={train_model.input_x1: text1, train_model.input_x2: text2, train_model.input_y: label})
+				_, step, loss, acc= sess.run([train_op, global_step, train_model.loss, train_model.accuracy], feed_dict={train_model.x1_input: text1, train_model.x2_input: text2, train_model.label: label})
 
 				print "training --- epoch number:", str(i), ", batch:", str(j), ", loss:", str(loss), ", accuracy:", acc
 				
@@ -74,15 +75,10 @@ def train(arg_config, training_data_mgr, valid_data_mgr, testing_data_mgr):
 					total_label = []
 					valid_data_mgr.initialize_batch_cnt()
 					for k in range(0, valid_data_mgr.total_batch, 64):
-						if k % 640 == 0:
-							sys.stdout.flush()
-							sys.stdout.write(" " * 30 + "\r")
-							sys.stdout.flush()
-							sys.stdout.write("processing: " + str(k) + "/" + str(valid_data_mgr.total_batch) + "\r")
-
 						text1, text2, label = valid_data_mgr.next_batch(64)
 						total_label.extend(label.tolist())
-						scores = sess.run(train_model.scores, feed_dict={train_model.input_x1: text1, train_model.input_x2: text2, train_model.input_y: label})
+						# scores = sess.run(train_model.scores, feed_dict={train_model.input_x1: text1, train_model.input_x2: text2, train_model.input_y: label})
+						scores = sess.run(train_model.scores, feed_dict={train_model.x1_input: text1, train_model.x2_input: text2, train_model.label: label})
 						total_score_list.extend(scores.tolist())
 
 					total_case_number, right_case_number = calculateAccuracy(total_score_list, total_label)
@@ -90,24 +86,20 @@ def train(arg_config, training_data_mgr, valid_data_mgr, testing_data_mgr):
 					print "Validation accuracy:", float(right_case_number)/total_case_number
 
 
-					with open("./result/res_2.txt", "a") as fout:
+					with open("./result/res_5.txt", "a") as fout:
 						line = "training --- epoch number: " + str(i) + ", batch: " + str(j) + "\n"
 						line1 = "Validation: There are " + str(total_case_number) + " cases in the validation set, " + str(right_case_number) + " cases are right.\n"
 						line2 = "Validation accuracy:" + str(float(right_case_number)/total_case_number) + "\n"
 						fout.write((line + line1+ line2 + "\n").encode('utf-8'))
-
+			
 			total_score_list = []
 			total_label = []
 			testing_data_mgr.initialize_batch_cnt()
 			for k in range(0, testing_data_mgr.total_batch, 64):
-				sys.stdout.flush()
-				sys.stdout.write(" " + "\r")
-				sys.stdout.flush()
-				sys.stdout.write(str(k) + "/" + str(testing_data_mgr.total_batch) + "\r")
-
 				text1, text2, label = testing_data_mgr.next_batch(64)
 				total_label.extend(label.tolist())
-				scores = sess.run(train_model.scores, feed_dict={train_model.input_x1: text1, train_model.input_x2: text2, train_model.input_y: label})
+				# scores = sess.run(train_model.scores, feed_dict={train_model.input_x1: text1, train_model.input_x2: text2, train_model.input_y: label})
+				scores = sess.run(train_model.scores, feed_dict={train_model.x1_input: text1, train_model.x2_input: text2, train_model.label: label})
 				total_score_list.extend(scores.tolist())
 
 			total_case_number, right_case_number = calculateAccuracy(total_score_list, total_label)
@@ -115,11 +107,10 @@ def train(arg_config, training_data_mgr, valid_data_mgr, testing_data_mgr):
 			print "Testing accuracy:", float(right_case_number)/total_case_number
 
 
-			with open("./result/res_2.txt", "a") as fout:
+			with open("./result/res_5.txt", "a") as fout:
 				line = "=========================================\nTesting: epoch: " + str(i) + "\n"
 				line1 = "Testing: There are " + str(total_case_number) + " cases in the testing set, " + str(right_case_number) + "cases are right.\n"
 				line2 = "Testing accuracy:" + str(float(right_case_number)/total_case_number) + "\n================================\n"
 				fout.write((line1+ line2 + "\n").encode('utf-8'))
-
-
+			
 

@@ -36,7 +36,7 @@ class MPCNN(object):
 				
 				self.embedded_chars_inp2 = tf.nn.embedding_lookup(W, self.input_x2,name="embedded_chars_inp2")
 				self.embedded_chars_inp2_expanded = tf.expand_dims(self.embedded_chars_inp2, axis=-1, name="embedded_chars_inp2_expanded") #conv2d needs 4d tensor of shape [batch, width(inp1_seq_len), height(embedding_size), channel(adding artifically here)].
- 
+
 
 		#blockA
 		inp1_avgpooled_outputs_groupA = []

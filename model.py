@@ -6,10 +6,10 @@ class MPCNN:
 	def __init__(self, arg_config):
 		self.x1_input = tf.placeholder(tf.int32, [None, arg_config.max_length], name="input_x1") # [batch_size, max_length]
 		self.x2_input = tf.placeholder(tf.int32, [None, arg_config.max_length], name="input_x2") # [batch_size, max_length]
-		self.label = tf.placeholder(tf.float32, [None, arg_config.num_classes], name="label") # [batch_size, num_classses]
+		self.label = tf.placeholder(tf.int32, [None, arg_config.num_classes], name="label") # [batch_size, num_classses]
 
 		with tf.variable_scope("embedding_layer"):
-			W = tf.get_variable("W", [arg_config.vocab_size, arg_config.embedding_size], initializer=tf.random_normal_initializer(mean=0, stddev=1))
+			W = tf.get_variable("W", [arg_config.vocab_size, arg_config.embedding_size])
 			self.x1_embedding = tf.nn.embedding_lookup(W, self.x1_input, name="x1_embedding") # [batch_size, max_length, embedding_size]
 			self.x2_embedding = tf.nn.embedding_lookup(W, self.x2_input, name="x2_embedding") # [batch_size, max_length, embedding_size]
 
@@ -33,6 +33,7 @@ class MPCNN:
 
 		all_type_x2_pools_groupA =[]
 		all_type_x1_pools_groupA =[]
+
 		all_type_x2_pools_groupB =[]
 		all_type_x1_pools_groupB =[]
 
@@ -157,10 +158,7 @@ class MPCNN:
 			correct_predictions = tf.equal(self.predictions, tf.argmax(self.label, 1))
 			self.accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"), name="accuracy")
 
-		# self.optimizer = tf.train.AdamOptimizer(learning_rate=arg_config.learning_rate)
-		# self.train_op = self.optimizer.minimize(self.loss)		
 		
-		# self.init = tf.global_variables_initializer()
 
 
 
